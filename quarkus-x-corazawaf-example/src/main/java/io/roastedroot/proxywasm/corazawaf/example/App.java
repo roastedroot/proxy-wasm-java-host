@@ -1,5 +1,6 @@
 package io.roastedroot.proxywasm.corazawaf.example;
 
+import com.dylibso.chicory.experimental.aot.AotMachine;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
 import io.roastedroot.proxywasm.LogHandler;
@@ -40,6 +41,7 @@ public class App {
                         .withLogger(DEBUG ? LogHandler.SYSTEM : null)
                         .withPluginConfig(CONFIG)
                         .withMetricsHandler(new SimpleMetricsHandler())
+                        .withMachineFactory(AotMachine::new)
                         .build(module);
     }
 }
