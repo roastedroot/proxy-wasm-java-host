@@ -10,6 +10,8 @@ import static io.roastedroot.proxywasm.WellKnownProperties.PLUGIN_VM_ID;
 
 import com.dylibso.chicory.runtime.ImportMemory;
 import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.runtime.Machine;
+import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasm.WasmModule;
 import io.roastedroot.proxywasm.ArrayProxyMap;
 import io.roastedroot.proxywasm.ChainedHandler;
@@ -35,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 
 public final class Plugin {
 
@@ -187,33 +190,43 @@ public final class Plugin {
             return this;
         }
 
-        public Plugin.Builder withShared(boolean shared) {
+        public Builder withShared(boolean shared) {
             this.shared = shared;
             return this;
         }
 
-        public Plugin.Builder withVmConfig(byte[] vmConfig) {
+        public Builder withVmConfig(byte[] vmConfig) {
             this.vmConfig = vmConfig;
             return this;
         }
 
-        public Plugin.Builder withVmConfig(String vmConfig) {
+        public Builder withVmConfig(String vmConfig) {
             this.vmConfig = bytes(vmConfig);
             return this;
         }
 
-        public Plugin.Builder withPluginConfig(byte[] pluginConfig) {
+        public Builder withPluginConfig(byte[] pluginConfig) {
             this.pluginConfig = pluginConfig;
             return this;
         }
 
-        public Plugin.Builder withPluginConfig(String pluginConfig) {
+        public Builder withPluginConfig(String pluginConfig) {
             this.pluginConfig = bytes(pluginConfig);
             return this;
         }
 
-        public Plugin.Builder withImportMemory(ImportMemory memory) {
+        public Builder withImportMemory(ImportMemory memory) {
             proxyWasmBuilder = proxyWasmBuilder.withImportMemory(memory);
+            return this;
+        }
+
+        public Builder withMachineFactory(Function<Instance, Machine> machineFactory) {
+            proxyWasmBuilder.withMachineFactory(machineFactory);
+            return this;
+        }
+
+        public Builder withWasiOptions(WasiOptions options) {
+            proxyWasmBuilder.withWasiOptions(options);
             return this;
         }
 

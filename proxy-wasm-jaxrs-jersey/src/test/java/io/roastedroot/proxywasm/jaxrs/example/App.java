@@ -1,5 +1,6 @@
 package io.roastedroot.proxywasm.jaxrs.example;
 
+import com.dylibso.chicory.experimental.aot.AotMachine;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.google.gson.Gson;
@@ -24,6 +25,7 @@ public class App {
                         .withName("headerTests")
                         .withLogger(new MockLogger("headerTests"))
                         .withPluginConfig(gson.toJson(Map.of("type", "headerTests")))
+                        .withMachineFactory(AotMachine::new)
                         .build(parseTestModule("/go-examples/unit_tester/main.wasm"));
     }
 
@@ -34,6 +36,7 @@ public class App {
                         .withShared(false)
                         .withLogger(new MockLogger("headerTestsNotShared"))
                         .withPluginConfig(gson.toJson(Map.of("type", "headerTests")))
+                        .withMachineFactory(AotMachine::new)
                         .build(parseTestModule("/go-examples/unit_tester/main.wasm"));
     }
 
@@ -43,6 +46,7 @@ public class App {
                         .withName("tickTests")
                         .withLogger(new MockLogger("tickTests"))
                         .withPluginConfig(gson.toJson(Map.of("type", "tickTests")))
+                        .withMachineFactory(AotMachine::new)
                         .build(parseTestModule("/go-examples/unit_tester/main.wasm"));
     }
 
@@ -53,6 +57,7 @@ public class App {
                         .withLogger(new MockLogger("ffiTests"))
                         .withPluginConfig(gson.toJson(Map.of("type", "ffiTests")))
                         .withForeignFunctions(Map.of("reverse", App::reverse))
+                        .withMachineFactory(AotMachine::new)
                         .build(parseTestModule("/go-examples/unit_tester/main.wasm"));
     }
 
@@ -76,6 +81,7 @@ public class App {
                                                 "upstream", "web_service",
                                                 "path", "/ok")))
                         .withUpstreams(Map.of("web_service", "localhost:8081"))
+                        .withMachineFactory(AotMachine::new)
                         .build(parseTestModule("/go-examples/unit_tester/main.wasm"));
     }
 }

@@ -2,11 +2,13 @@ package io.roastedroot.proxywasm;
 
 import static io.roastedroot.proxywasm.Helpers.len;
 
+import com.dylibso.chicory.experimental.aot.AotMachine;
 import com.dylibso.chicory.runtime.ByteArrayMemory;
 import com.dylibso.chicory.runtime.HostFunction;
 import com.dylibso.chicory.runtime.ImportMemory;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.runtime.Machine;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.WasmModule;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 public final class ProxyWasm implements Closeable {
 
@@ -226,6 +229,7 @@ public final class ProxyWasm implements Closeable {
         private ImportMemory memory;
         private WasiOptions wasiOptions;
         private boolean start = true;
+        private Function<Instance, Machine> machineFactory;
 
         @Override
         @SuppressWarnings("NoClone")
@@ -261,6 +265,11 @@ public final class ProxyWasm implements Closeable {
             return this;
         }
 
+        public ProxyWasm.Builder withMachineFactory(Function<Instance, Machine> machineFactory) {
+            this.machineFactory = machineFactory;
+            return this;
+        }
+
         Builder() {}
 
         public ProxyWasm build(Instance instance) throws StartException {
@@ -274,6 +283,10 @@ public final class ProxyWasm implements Closeable {
 
         public ProxyWasm build(Instance.Builder instanceBuilder) throws StartException {
             var imports = ImportValues.builder();
+
+            if (this.machineFactory != null) {
+                instanceBuilder.withMachineFactory(AotMachine::new);
+            }
 
             imports.addMemory(Objects.requireNonNullElseGet(memory, this::defaultImportMemory));
             imports.addFunction(toHostFunctions());
