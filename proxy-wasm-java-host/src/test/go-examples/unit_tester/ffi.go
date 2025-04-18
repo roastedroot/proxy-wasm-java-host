@@ -17,6 +17,7 @@ package main
 import (
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm"
 	"github.com/proxy-wasm/proxy-wasm-go-sdk/proxywasm/types"
+	"github.com/tidwall/gjson"
 	"strings"
 )
 
@@ -25,7 +26,6 @@ type ffiTests struct {
 	types.DefaultHttpContext
 	contextID     uint32
 	pluginContext *pluginContext
-	path          string
 }
 
 func (
@@ -36,48 +36,33 @@ p *pluginContext) ffiTests(contextID uint32) types.HttpContext {
 	}
 }
 
-func (ctx *ffiTests) OnHttpRequestHeaders(int, bool) types.Action {
-	pathBytes, err := proxywasm.GetProperty([]string{"request", "path"})
-	if err != nil {
-		proxywasm.LogCriticalf("failed to get :path : %v", err)
-	} else {
-		ctx.path = string(pathBytes)
+func (ctx *ffiTests) OnHttpResponseBody(bodySize int, endOfStream bool) types.Action {
+
+	// we need the full response body to call the FFI function
+	if !endOfStream {
+		// Wait until we see the entire body to replace.
+		return types.ActionPause
 	}
-	return types.ActionContinue
-}
 
-func (ctx *ffiTests) OnHttpRequestBody(bodySize int, endOfStream bool) types.Action {
-	if strings.HasPrefix(ctx.path, "/ffiTests/") {
+	funcName := strings.TrimSpace(gjson.Get(ctx.pluginContext.config, "function").Str)
+	proxywasm.LogInfof("calling ffi: %s", funcName)
 
-		// we need the full request body to call the FFI function
-		if !endOfStream {
-			// Wait until we see the entire body to replace.
-			return types.ActionPause
-		}
-
-		funcName := strings.TrimPrefix(ctx.path, "/ffiTests/")
-		proxywasm.LogInfof("calling ffi: %s", funcName)
-
-		body, err := proxywasm.GetHttpRequestBody(0, bodySize)
-		if err != nil {
-			proxywasm.LogErrorf("failed to get request body: %v", err)
-			return types.ActionContinue
-		}
-
-		result, err := proxywasm.CallForeignFunction(funcName, body)
-		if err != nil {
-			proxywasm.LogErrorf("failed to call FFI: %v", err)
-			return types.ActionContinue
-		}
-
-		if err := proxywasm.SendHttpResponse(200, [][2]string{}, result, -1); err != nil {
-			proxywasm.LogErrorf("failed to send FFI response: %v", err)
-			return types.ActionContinue
-		}
-		
+	body, err := proxywasm.GetHttpResponseBody(0, bodySize)
+	if err != nil {
+		proxywasm.LogErrorf("failed to get response body: %v", err)
 		return types.ActionContinue
 	}
-	proxywasm.LogInfo("noop")
+
+	result, err := proxywasm.CallForeignFunction(funcName, body)
+	if err != nil {
+		proxywasm.LogErrorf("failed to call FFI: %v", err)
+		return types.ActionContinue
+	}
+
+	if err := proxywasm.ReplaceHttpResponseBody([]byte(result)); err != nil {
+		proxywasm.LogErrorf("failed to replace the response: %v", err)
+		return types.ActionContinue
+	}
 
 	return types.ActionContinue
 }

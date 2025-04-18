@@ -38,14 +38,14 @@ public class Resources {
     @Path("/headerTests")
     @GET
     @WasmPlugin("headerTests")
-    public String uhttpHeaders(@HeaderParam("x-request-counter") String counter) {
+    public String httpHeaders(@HeaderParam("x-request-counter") String counter) {
         return String.format("counter: %s", counter);
     }
 
     @Path("/headerTestsNotShared")
     @GET
     @WasmPlugin("headerTestsNotShared")
-    public String unotSharedHttpHeaders(@HeaderParam("x-request-counter") String counter) {
+    public String notSharedHttpHeaders(@HeaderParam("x-request-counter") String counter) {
         return String.format("counter: %s", counter);
     }
 
@@ -67,6 +67,13 @@ public class Resources {
     @GET
     @WasmPlugin("httpCallTests")
     public String httpCallTests() {
+        return "hello world";
+    }
+
+    @Path("/httpCallTestsAndFFI")
+    @GET
+    @WasmPlugin({"ffiTests", "httpCallTests"})
+    public String httpCallTestsAndFFI() {
         return "hello world";
     }
 }

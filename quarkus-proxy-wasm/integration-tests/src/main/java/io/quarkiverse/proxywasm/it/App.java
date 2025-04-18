@@ -61,7 +61,8 @@ public class App {
                 Plugin.builder()
                         .withName("ffiTests")
                         .withLogger(new MockLogger("ffiTests"))
-                        .withPluginConfig(gson.toJson(Map.of("type", "ffiTests")))
+                        .withPluginConfig(
+                                gson.toJson(Map.of("type", "ffiTests", "function", "reverse")))
                         .withForeignFunctions(Map.of("reverse", App::reverse))
                         .withMachineFactory(AotMachine::new)
                         .build(parseTestModule("/go-examples/unit_tester/main.wasm"));

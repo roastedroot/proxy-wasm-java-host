@@ -8,8 +8,10 @@ import io.roastedroot.proxywasm.plugin.ServerAdaptor;
 import jakarta.ws.rs.container.DynamicFeature;
 import jakarta.ws.rs.container.ResourceInfo;
 import jakarta.ws.rs.core.FeatureContext;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
 public abstract class AbstractWasmPluginFeature implements DynamicFeature {
 
@@ -63,10 +65,27 @@ public abstract class AbstractWasmPluginFeature implements DynamicFeature {
                         resourceInfo.getResourceClass().getAnnotation(WasmPlugin.class);
             }
             if (pluignNameAnnotation != null) {
-                Pool pool = pluginPools.get(pluignNameAnnotation.value());
-                if (pool != null) {
-                    context.register(new WasmPluginFilter(pool));
-                }
+                var pools =
+                        Arrays.stream(pluignNameAnnotation.value())
+                                .map(
+                                        (name) -> {
+                                            Pool pool = pluginPools.get(name);
+                                            if (pool != null) {
+                                                return pool;
+                                            } else {
+                                                throw new IllegalArgumentException(
+                                                        "Wasm plugin not found: "
+                                                                + name
+                                                                + " for resource: "
+                                                                + resourceInfo
+                                                                        .getResourceClass()
+                                                                        .getName()
+                                                                + "."
+                                                                + resourceMethod.getName());
+                                            }
+                                        })
+                                .collect(Collectors.toList());
+                context.register(new WasmPluginFilter(pools));
             }
         }
     }

@@ -18,20 +18,27 @@ import jakarta.ws.rs.ext.WriterInterceptor;
 import jakarta.ws.rs.ext.WriterInterceptorContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 public class WasmPluginFilter
         implements ContainerRequestFilter, WriterInterceptor, ContainerResponseFilter {
-    private static final String FILTER_CONTEXT_PROPERTY_NAME = HttpContext.class.getName();
+    private static final String FILTER_CONTEXT_PROPERTY_NAME = HttpContext.class.getName() + ":";
 
-    private final Pool pluginPool;
+    private final List<Pool> pluginPools;
 
-    public WasmPluginFilter(Pool pluginPool) {
-        this.pluginPool = pluginPool;
+    public WasmPluginFilter(List<Pool> pluginPool) {
+        this.pluginPools = List.copyOf(pluginPool);
     }
 
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
+        for (var pluginPool : pluginPools) {
+            filter(requestContext, pluginPool);
+        }
+    }
 
+    private void filter(ContainerRequestContext requestContext, Pool pluginPool)
+            throws IOException {
         Plugin plugin;
         try {
             plugin = pluginPool.borrow();
@@ -46,7 +53,8 @@ public class WasmPluginFilter
                     (JaxrsHttpRequestAdaptor)
                             plugin.getServerAdaptor().httpRequestAdaptor(requestContext);
             var httpContext = plugin.createHttpContext(requestAdaptor);
-            requestContext.setProperty(FILTER_CONTEXT_PROPERTY_NAME, httpContext);
+            requestContext.setProperty(
+                    FILTER_CONTEXT_PROPERTY_NAME + pluginPool.name(), httpContext);
 
             // the plugin may not be interested in the request headers.
             if (httpContext.context().hasOnRequestHeaders()) {
@@ -106,7 +114,20 @@ public class WasmPluginFilter
     public void filter(
             ContainerRequestContext requestContext, ContainerResponseContext responseContext)
             throws IOException {
-        var httpContext = (HttpContext) requestContext.getProperty(FILTER_CONTEXT_PROPERTY_NAME);
+        for (var pluginPool : pluginPools) {
+            filter(requestContext, responseContext, pluginPool);
+        }
+    }
+
+    private void filter(
+            ContainerRequestContext requestContext,
+            ContainerResponseContext responseContext,
+            Pool pluginPool)
+            throws IOException {
+        var httpContext =
+                (HttpContext)
+                        requestContext.getProperty(
+                                FILTER_CONTEXT_PROPERTY_NAME + pluginPool.name());
         if (httpContext == null) {
             throw new WebApplicationException(interalServerError());
         }
@@ -169,18 +190,8 @@ public class WasmPluginFilter
     @Override
     public void aroundWriteTo(WriterInterceptorContext ctx)
             throws IOException, WebApplicationException {
-        var httpContext = (HttpContext) ctx.getProperty(FILTER_CONTEXT_PROPERTY_NAME);
-        if (httpContext == null) {
-            throw new WebApplicationException(interalServerError());
-        }
 
         try {
-            httpContext.plugin().lock();
-
-            // the plugin may not be interested in the request body.
-            if (!httpContext.context().hasOnResponseBody()) {
-                ctx.proceed();
-            }
 
             var original = ctx.getOutputStream();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -188,32 +199,56 @@ public class WasmPluginFilter
             ctx.proceed();
 
             byte[] bytes = baos.toByteArray();
-            httpContext.setHttpResponseBody(bytes);
-            var action = httpContext.context().callOnResponseBody(true);
-            bytes = httpContext.getHttpResponseBody();
-            if (action == Action.CONTINUE) {
-                // continue means plugin is done reading the body.
-                httpContext.setHttpResponseBody(null);
-            } else {
-                httpContext.maybePause();
-            }
 
-            // does the plugin want to respond early?
-            var sendResponse = httpContext.consumeSentHttpResponse();
-            if (sendResponse != null) {
-                throw new WebApplicationException(toResponse(sendResponse));
+            for (var pluginPool : pluginPools) {
+                var httpContext =
+                        (HttpContext)
+                                ctx.getProperty(FILTER_CONTEXT_PROPERTY_NAME + pluginPool.name());
+                if (httpContext == null) {
+                    throw new WebApplicationException(interalServerError());
+                }
+
+                httpContext.plugin().lock();
+
+                // the plugin may not be interested in the request body.
+                if (!httpContext.context().hasOnResponseBody()) {
+                    ctx.proceed();
+                }
+
+                httpContext.setHttpResponseBody(bytes);
+                var action = httpContext.context().callOnResponseBody(true);
+                bytes = httpContext.getHttpResponseBody();
+                if (action == Action.CONTINUE) {
+                    // continue means plugin is done reading the body.
+                    httpContext.setHttpResponseBody(null);
+                } else {
+                    httpContext.maybePause();
+                }
+
+                // does the plugin want to respond early?
+                var sendResponse = httpContext.consumeSentHttpResponse();
+                if (sendResponse != null) {
+                    throw new WebApplicationException(toResponse(sendResponse));
+                }
             }
 
             // plugin may have modified the body
             original.write(bytes);
 
         } finally {
-            // allow other request to use the plugin.
-            httpContext.context().close();
-            httpContext.plugin().unlock();
+            for (var pluginPool : pluginPools) {
+                var httpContext =
+                        (HttpContext)
+                                ctx.getProperty(FILTER_CONTEXT_PROPERTY_NAME + pluginPool.name());
 
-            // TODO: will aroundWriteTo always get called so that we can avoid leaking the plugin?
-            this.pluginPool.release(httpContext.plugin());
+                // allow other request to use the plugin.
+                httpContext.context().close();
+                httpContext.plugin().unlock();
+
+                // TODO: will aroundWriteTo always get called so that we can avoid leaking the
+                // plugin?
+                pluginPool.release(httpContext.plugin());
+            }
         }
     }
 

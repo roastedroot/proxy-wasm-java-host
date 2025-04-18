@@ -7,7 +7,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
-public class FFITest {
+public class ResourcesTest {
 
     @Test
     public void reverse() throws InterruptedException {

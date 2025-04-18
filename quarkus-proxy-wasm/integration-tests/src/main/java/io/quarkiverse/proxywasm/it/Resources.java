@@ -69,4 +69,11 @@ public class Resources {
     public String httpCallTests() {
         return "hello world";
     }
+
+    @Path("/httpCallTestsAndFFI")
+    @GET
+    @WasmPlugin({"ffiTests", "httpCallTests"})
+    public String httpCallTestsAndFFI() {
+        return "hello world";
+    }
 }

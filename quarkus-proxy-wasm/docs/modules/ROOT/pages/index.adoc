@@ -1,8 +1,27 @@
-= Quarkus Proxy Wasm
-
+= Using the Proxy-Wasm Filter
 include::./includes/attributes.adoc[]
+:categories: security
+:keywords: wasm,jaxrs,filter
+:summary: This guide explains how your Quarkus application can utilize proxy wasm plugins to filter requests to Jakarta REST endpoints.
+:extension-name: Proxy-Wasm Filter
+:topics: wasm
 
-TIP: Describe what the extension does here.
+This guide explains how your Quarkus application can utilize Proxy-Wasm plugins to filter requests to Jakarta REST (formerly known as JAX-RS) endpoints.
+
+Proxy-Wasm is a plugin system for network proxies. It lets you write plugins that can act as request filters in a portable, sandboxed, and language-agnostic way, thanks to WebAssembly.
+
+Docs and SDKs for plugin authors:
+
+* link:https://github.com/istio-ecosystem/wasm-extensions[Proxy-Wasm ABI specification]
+* link:https://github.com/proxy-wasm/proxy-wasm-cpp-sdk[Proxy-Wasm C++ SDK]
+* link:https://github.com/proxy-wasm/proxy-wasm-rust-sdk[Proxy-Wasm Rust SDK]
+* link:https://github.com/proxy-wasm/proxy-wasm-go-sdk[Proxy-Wasm Go SDK]
+* link:https://github.com/solo-io/proxy-runtime[Proxy-Wasm AssemblyScript SDK]
+
+Popular Proxy-Wasm plugins:
+
+* link:https://github.com/corazawaf/coraza-proxy-wasm[Coraza WAF]
+* link:https://github.com/Kuadrant/wasm-shim/[Kuadrant]
 
 == Installation
 
@@ -19,9 +38,137 @@ For instance, with Maven, add the following dependency to your POM file:
 </dependency>
 ----
 
-[[extension-configuration-reference]]
-== Extension Configuration Reference
+=== Annotating the Jakarta REST resource
 
-TIP: Remove this section if you don't have Quarkus configuration properties in your extension.
+We will walk you through the steps to create add a Proxy-Wasm filter to a Jakarta REST resource.
+Let's assume you have an existing Jakarta REST resource that returns a simple string:
 
-include::includes/quarkus-proxy-wasm.adoc[leveloffset=+1, opts=optional]
+[source,java]
+----
+package org.example;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+
+@Path("/example")
+public class Example {
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "hello";
+    }
+}
+----
+
+To filter requests to that resource you would add a `@WasmPlugin` at either the class or method level depending on whether you want to filter all requests to the resource or just a specific method.
+
+The `@WasmPlugin` annotation should list the names of all the pluigns you want to apply to the resource or method.
+
+[source,java]
+----
+package org.example;
+
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import io.roastedroot.proxywasm.jaxrs.WasmPlugin;
+
+@WasmPlugin("waf")
+@Path("/example")
+public class Example {
+
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String hello() {
+        return "hello";
+    }
+}
+----
+
+The example above will apply the `waf` plugin instance to all requests to the `/example` resource.
+
+=== Configuring the Proxy-Wasm plugin
+
+
+[source,java]
+----
+package org.example;
+
+import com.dylibso.chicory.wasm.Parser;
+import com.dylibso.chicory.wasm.WasmModule;
+import io.roastedroot.proxywasm.StartException;
+import io.roastedroot.proxywasm.plugin.Plugin;
+import io.roastedroot.proxywasm.plugin.PluginFactory;
+import io.roastedroot.proxywasm.plugin.SimpleMetricsHandler;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+
+@ApplicationScoped
+public class App {
+
+    private static WasmModule module =
+        Parser.parse(App.class.getResourceAsStream("coraza-proxy-wasm.wasm"));      <1>
+
+    // loads the plugin configuration as a classpath resource
+    static final String CONFIG; <4>
+    static {
+        try (InputStream is = App.class.getResourceAsStream("waf-config.json")) {
+            CONFIG = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    // creates a plugin factory that loads the wasm module and configuration
+    @Produces
+    public PluginFactory waf() throws StartException {
+        return () ->
+                Plugin.builder()
+                        .withName("waf")                                            <2>
+                        .withPluginConfig(CONFIG)
+                        .withMetricsHandler(new SimpleMetricsHandler())             <3>
+                        .build(module);
+    }
+}
+
+----
+
+<1> This will load the `src/main/resources/org/example/coraza-proxy-wasm.wasm` file.  You can get that wasm module link:https://github.com/corazawaf/coraza-proxy-wasm/releases/tag/0.5.0[here].
+<2> The name of the plugin must match the name used in the `@WasmPlugin` annotation.
+<3> The corazawf wasm module requires access to publish custom metrics.  We give it `SimpleMetricsHandler` implementation which gives it access to do so, but those metrics are only kept in memory and don't get exposed anywhere.  You can implement your own `MetricsHandler` to publish the metrics to a monitoring system of your choice.
+<4> The configuration that will be passed to the plugin.  Since we are loading from the classpath store the config inf `src/main/resources/org/example/waf-config.json`:
+
+[source,json]
+----
+{
+  "directives_map": {
+    "rs1": [
+      "Include @demo-conf",
+      "Include @crs-setup-conf",
+      "SecDefaultAction \"phase:3,log,auditlog,pass\"",
+      "SecDefaultAction \"phase:4,log,auditlog,pass\"",
+      "SecDefaultAction \"phase:5,log,auditlog,pass\"",
+      "SecDebugLogLevel 9",
+      "Include @owasp_crs/*.conf",
+      "SecRule REQUEST_URI \"@streq /admin\" \"id:101,phase:1,t:lowercase,deny\" \nSecRule REQUEST_BODY \"@rx maliciouspayload\" \"id:102,phase:2,t:lowercase,deny\" \nSecRule RESPONSE_HEADERS::status \"@rx 406\" \"id:103,phase:3,t:lowercase,deny\" \nSecRule RESPONSE_BODY \"@contains responsebodycode\" \"id:104,phase:4,t:lowercase,deny\""
+    ]
+  },
+  "default_directives": "rs1",
+  "metric_labels": {
+    "owner": "coraza",
+    "identifier": "global"
+  },
+  "per_authority_directives":{
+    "bar.example.com":"rs1"
+  }
+}
+----
+

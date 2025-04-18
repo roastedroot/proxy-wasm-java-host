@@ -18,4 +18,15 @@ public class HttpCallTest extends BaseTest {
                 .body(equalTo("ok"))
                 .header("echo-test", "ok");
     }
+
+    @Test
+    public void httpCallTestsAndFFI() throws InterruptedException {
+        given().header("test", "ok")
+                .when()
+                .get("/httpCallTestsAndFFI")
+                .then()
+                .statusCode(200)
+                .body(equalTo("ko"))
+                .header("echo-test", "ok");
+    }
 }

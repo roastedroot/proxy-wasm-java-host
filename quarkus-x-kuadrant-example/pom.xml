@@ -90,6 +90,7 @@
       <plugin>
         <groupId>com.dylibso.chicory</groupId>
         <artifactId>aot-maven-plugin-experimental</artifactId>
+        <version>${chicory.version}</version>
         <executions>
           <execution>
             <id>wasm-shim</id>

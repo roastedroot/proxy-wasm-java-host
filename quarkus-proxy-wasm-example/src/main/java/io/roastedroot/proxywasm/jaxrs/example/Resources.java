@@ -10,7 +10,7 @@ public class Resources {
     @Path("/test")
     @GET
     @WasmPlugin("example") // filter with example wasm plugin
-    public String ffiTests() {
+    public String example() {
         return "Hello World";
     }
 }
