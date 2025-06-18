@@ -3,20 +3,15 @@ package io.roastedroot.proxywasm.internal;
 import static io.roastedroot.proxywasm.internal.Helpers.len;
 
 import com.dylibso.chicory.runtime.ByteArrayMemory;
-import com.dylibso.chicory.runtime.HostFunction;
 import com.dylibso.chicory.runtime.ImportMemory;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Machine;
-import com.dylibso.chicory.wasi.WasiOptions;
-import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.WasmModule;
 import com.dylibso.chicory.wasm.types.MemoryLimits;
-import com.dylibso.chicory.wasm.types.ValueType;
 import io.roastedroot.proxywasm.StartException;
 import java.io.Closeable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,7 +20,6 @@ import java.util.function.Function;
 public final class ProxyWasm implements Closeable {
 
     private final ABI abi;
-    private final WasiPreview1 wasi;
 
     private final AtomicInteger nextContextID = new AtomicInteger(1);
     private Context pluginContext;
@@ -42,7 +36,6 @@ public final class ProxyWasm implements Closeable {
 
     private ProxyWasm(Builder other) throws StartException {
         this.pluginHandler = Objects.requireNonNullElse(other.pluginHandler, new Handler() {});
-        this.wasi = other.wasi;
         this.abi = other.abi;
         this.abi.setHandler(createImportsHandler());
 
@@ -196,9 +189,6 @@ public final class ProxyWasm implements Closeable {
             return;
         }
         this.pluginContext.close();
-        if (wasi != null) {
-            wasi.close();
-        }
     }
 
     public static ProxyWasm.Builder builder() {
@@ -262,11 +252,9 @@ public final class ProxyWasm implements Closeable {
     public static class Builder implements Cloneable {
 
         private final ABI abi = new ABI();
-        private WasiPreview1 wasi;
 
         private Handler pluginHandler;
         private ImportMemory memory;
-        private WasiOptions wasiOptions;
         private boolean start = true;
         private Function<Instance, Machine> machineFactory;
 
@@ -278,10 +266,6 @@ public final class ProxyWasm implements Closeable {
             } catch (CloneNotSupportedException e) {
                 throw new RuntimeException(e);
             }
-        }
-
-        public HostFunction[] toHostFunctions() {
-            return ABI_ModuleFactory.toHostFunctions(abi);
         }
 
         public Builder withStart(boolean start) {
@@ -296,11 +280,6 @@ public final class ProxyWasm implements Closeable {
 
         public ProxyWasm.Builder withImportMemory(ImportMemory memory) {
             this.memory = memory;
-            return this;
-        }
-
-        public ProxyWasm.Builder withWasiOptions(WasiOptions options) {
-            this.wasiOptions = options;
             return this;
         }
 
@@ -328,30 +307,7 @@ public final class ProxyWasm implements Closeable {
             }
 
             imports.addMemory(Objects.requireNonNullElseGet(memory, this::defaultImportMemory));
-            imports.addFunction(toHostFunctions());
-            imports.addFunction(
-                    new HostFunction(
-                            "env",
-                            "emscripten_notify_memory_growth",
-                            List.of(ValueType.I32),
-                            List.of(),
-                            (inst, args) -> {
-                                return null;
-                            }));
-
-            wasi =
-                    WasiPreview1.builder()
-                            .withOptions(
-                                    Objects.requireNonNullElseGet(
-                                            wasiOptions,
-                                            () ->
-                                                    WasiOptions.builder()
-                                                            .inheritSystem()
-                                                            .withArguments(List.of())
-                                                            .build()))
-                            .build();
-            imports.addFunction(wasi.toHostFunctions());
-            imports.addFunction(Helpers.withModuleName(wasi.toHostFunctions(), "wasi_unstable"));
+            imports.addFunction(abi.toHostFunctions());
 
             var instance =
                     instanceBuilder
@@ -367,10 +323,6 @@ public final class ProxyWasm implements Closeable {
                     "env",
                     "memory",
                     new ByteArrayMemory(new MemoryLimits(2, MemoryLimits.MAX_PAGES)));
-        }
-
-        WasiOptions defaultWasiOptions() {
-            return WasiOptions.builder().inheritSystem().build();
         }
     }
 }
