@@ -8,6 +8,7 @@ import static io.roastedroot.proxywasm.internal.Helpers.string;
 import com.dylibso.chicory.annotations.HostModule;
 import com.dylibso.chicory.annotations.WasmExport;
 import com.dylibso.chicory.runtime.ExportFunction;
+import com.dylibso.chicory.runtime.HostFunction;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Memory;
 import com.dylibso.chicory.runtime.WasmRuntimeException;
@@ -1920,5 +1921,18 @@ class ABI {
             return;
         }
         proxyOnForeignFunctionFn.apply(contextId, functionId, argumentsSize);
+    }
+
+    @WasmExport
+    void emscriptenNotifyMemoryGrowth(int size) {}
+
+    public HostFunction[] toHostFunctions() {
+        var functions = new ArrayList<>(List.of(ABI_ModuleFactory.toHostFunctions(this)));
+
+        HostFunction[] wasiFunctions = new ABI_WASI(handler).toHostFunctions();
+        functions.addAll(List.of(wasiFunctions));
+        functions.addAll(List.of(Helpers.withModuleName(wasiFunctions, "wasi_unstable")));
+
+        return functions.toArray(new HostFunction[0]);
     }
 }

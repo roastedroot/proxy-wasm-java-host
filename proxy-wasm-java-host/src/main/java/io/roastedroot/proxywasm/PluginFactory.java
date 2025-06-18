@@ -5,7 +5,6 @@ import static io.roastedroot.proxywasm.internal.Helpers.bytes;
 import com.dylibso.chicory.runtime.ImportMemory;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Machine;
-import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasm.WasmModule;
 import io.roastedroot.proxywasm.internal.ProxyWasm;
 import java.net.URI;
@@ -316,20 +315,6 @@ public interface PluginFactory {
         public PluginFactory.Builder withMachineFactory(
                 Function<Instance, Machine> machineFactory) {
             proxyWasmBuilder.withMachineFactory(machineFactory);
-            return this;
-        }
-
-        /**
-         * Configures WebAssembly System Interface (WASI) options for the plugin instance.
-         * WASI provides a standard interface for WASM modules to interact with the underlying operating system
-         * for tasks like file system access, environment variables, etc. While Proxy-WASM defines its own ABI,
-         * some modules might also utilize WASI features.
-         *
-         * @param options The {@link WasiOptions} to configure for the WASI environment.
-         * @return this {@code Builder} instance for method chaining.
-         */
-        public PluginFactory.Builder withWasiOptions(WasiOptions options) {
-            proxyWasmBuilder.withWasiOptions(options);
             return this;
         }
 
