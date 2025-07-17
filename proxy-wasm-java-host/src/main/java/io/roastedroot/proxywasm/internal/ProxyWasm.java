@@ -36,19 +36,7 @@ public final class ProxyWasm implements Closeable {
 
     private ProxyWasm(Builder other) throws StartException {
         this.pluginHandler = Objects.requireNonNullElse(other.pluginHandler, new Handler() {});
-        this.abi = other.abi;
-        this.abi.setHandler(createImportsHandler());
-
-        // initialize/start the vm
-        if (this.abi.initialize()) {
-            this.abi.main(0, 0);
-        } else {
-            this.abi.start();
-        }
-
-        if (other.start) {
-            start();
-        }
+        this.abi = new ABI(createImportsHandler());
     }
 
     public Handler getPluginHandler() {
@@ -251,12 +239,12 @@ public final class ProxyWasm implements Closeable {
 
     public static class Builder implements Cloneable {
 
-        private final ABI abi = new ABI();
-
         private Handler pluginHandler;
         private ImportMemory memory;
         private boolean start = true;
         private Function<Instance, Machine> machineFactory;
+
+        private Builder() {}
 
         @Override
         @SuppressWarnings("NoClone")
@@ -288,24 +276,16 @@ public final class ProxyWasm implements Closeable {
             return this;
         }
 
-        Builder() {}
-
-        public ProxyWasm build(Instance instance) throws StartException {
-            abi.setInstance(instance);
-            return new ProxyWasm(this.clone());
-        }
-
         public ProxyWasm build(WasmModule module) throws StartException {
-            return this.build(Instance.builder(module));
-        }
-
-        public ProxyWasm build(Instance.Builder instanceBuilder) throws StartException {
-            var imports = ImportValues.builder();
-
+            var instanceBuilder = Instance.builder(module);
             if (this.machineFactory != null) {
                 instanceBuilder.withMachineFactory(this.machineFactory);
             }
 
+            var proxyWasm = new ProxyWasm(this.clone());
+            ABI abi = proxyWasm.abi;
+
+            var imports = ImportValues.builder();
             imports.addMemory(Objects.requireNonNullElseGet(memory, this::defaultImportMemory));
             imports.addFunction(abi.toHostFunctions());
 
@@ -315,7 +295,18 @@ public final class ProxyWasm implements Closeable {
                             .withImportValues(imports.build())
                             .build();
 
-            return build(instance);
+            abi.setInstance(instance);
+
+            if (abi.initialize()) {
+                abi.main(0, 0);
+            } else {
+                abi.start();
+            }
+            if (start) {
+                proxyWasm.start();
+            }
+
+            return proxyWasm;
         }
 
         ImportMemory defaultImportMemory() {
