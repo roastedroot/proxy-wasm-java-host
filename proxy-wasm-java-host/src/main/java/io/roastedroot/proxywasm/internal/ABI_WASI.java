@@ -11,6 +11,7 @@ import com.dylibso.chicory.wasi.WasiPreview1;
 import io.roastedroot.proxywasm.LogLevel;
 import io.roastedroot.proxywasm.WasmException;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 /**
  * Implements a restricted subset of the WASI ABI, specifically so that a WASM module can
@@ -29,7 +30,7 @@ public class ABI_WASI {
     private final Handler handler;
 
     public ABI_WASI(Handler handler) {
-        this.handler = handler;
+        this.handler = Objects.requireNonNull(handler);
     }
 
     ////////////////////////////////////////////////////////////////////////////

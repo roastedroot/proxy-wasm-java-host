@@ -2,8 +2,7 @@ package io.roastedroot.proxywasm.examples;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.dylibso.chicory.experimental.aot.AotMachine;
-import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.compiler.MachineFactoryCompiler;
 import com.dylibso.chicory.wasm.Parser;
 import com.dylibso.chicory.wasm.WasmModule;
 import io.roastedroot.proxywasm.StartException;
@@ -24,9 +23,11 @@ public class DispatchCallOnTickTest {
     @Test
     public void testOnTick() throws StartException {
         var handler = new MockHandler();
-        ProxyWasm.Builder builder = ProxyWasm.builder().withPluginHandler(handler);
-        var instanceBuilder = Instance.builder(module).withMachineFactory(AotMachine::new);
-        try (var host = builder.build(instanceBuilder)) {
+        ProxyWasm.Builder builder =
+                ProxyWasm.builder()
+                        .withPluginHandler(handler)
+                        .withMachineFactory(MachineFactoryCompiler::compile);
+        try (var host = builder.build(module)) {
             assertEquals(tickMilliseconds, handler.getTickPeriodMilliseconds());
 
             for (int i = 1; i <= 10; i++) {

@@ -22,11 +22,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @HostModule("env")
 class ABI {
 
-    private Handler handler;
+    private final Handler handler;
     private Memory memory;
     ExportFunction initializeFn;
     ExportFunction mainFn;
@@ -58,12 +59,8 @@ class ABI {
     ExportFunction proxyOnQueueReadyFn;
     ExportFunction proxyOnForeignFunctionFn;
 
-    Handler getHandler() {
-        return handler;
-    }
-
-    void setHandler(Handler handler) {
-        this.handler = handler;
+    ABI(Handler handler) {
+        this.handler = Objects.requireNonNull(handler);
     }
 
     void setInstance(Instance instance) {
