@@ -6,6 +6,7 @@ import static io.roastedroot.proxywasm.internal.WellKnownHeaders.METHOD;
 import static io.roastedroot.proxywasm.internal.WellKnownHeaders.PATH;
 import static io.roastedroot.proxywasm.internal.WellKnownHeaders.SCHEME;
 import static io.roastedroot.proxywasm.internal.WellKnownProperties.PLUGIN_NAME;
+import static io.roastedroot.proxywasm.internal.WellKnownProperties.PLUGIN_ROOT_ID;
 import static io.roastedroot.proxywasm.internal.WellKnownProperties.PLUGIN_VM_ID;
 
 import io.roastedroot.proxywasm.ForeignFunction;
@@ -50,7 +51,8 @@ public final class Plugin implements io.roastedroot.proxywasm.Plugin {
             byte[] pluginConfig,
             MetricsHandler metricsHandler,
             SharedQueueHandler sharedQueueHandler,
-            SharedDataHandler sharedDataHandler)
+            SharedDataHandler sharedDataHandler,
+            HashMap<List<String>, byte[]> properties)
             throws StartException {
         Objects.requireNonNull(proxyWasm);
         this.name = Objects.requireNonNullElse(name, "default");
@@ -61,12 +63,12 @@ public final class Plugin implements io.roastedroot.proxywasm.Plugin {
         this.vmConfig = vmConfig;
         this.pluginConfig = pluginConfig;
         this.logger = Objects.requireNonNullElse(logger, LogHandler.DEFAULT);
-        ;
         this.metricsHandler = Objects.requireNonNullElse(metricsHandler, MetricsHandler.DEFAULT);
         this.sharedQueueHandler =
                 Objects.requireNonNullElse(sharedQueueHandler, SharedQueueHandler.DEFAULT);
         this.sharedDataHandler =
                 Objects.requireNonNullElse(sharedDataHandler, SharedDataHandler.DEFAULT);
+        this.properties = Objects.requireNonNull(properties);
 
         this.wasm = proxyWasm;
         this.wasm.setPluginHandler(new HandlerImpl());
@@ -138,7 +140,7 @@ public final class Plugin implements io.roastedroot.proxywasm.Plugin {
     private Runnable cancelTick;
     private final HashMap<String, ForeignFunction> foreignFunctions;
     private byte[] funcCallData = new byte[0];
-    private final HashMap<List<String>, byte[]> properties = new HashMap<>();
+    private final HashMap<List<String>, byte[]> properties;
 
     class HandlerImpl extends ChainedHandler {
 
@@ -168,6 +170,9 @@ public final class Plugin implements io.roastedroot.proxywasm.Plugin {
         public byte[] getProperty(List<String> path) throws WasmException {
             // TODO: do we need field for vm_id and root_id?
             if (PLUGIN_VM_ID.equals(path)) {
+                return bytes(name);
+            }
+            if (PLUGIN_ROOT_ID.equals(path)) {
                 return bytes(name);
             }
             if (PLUGIN_NAME.equals(path)) {

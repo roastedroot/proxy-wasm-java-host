@@ -8,7 +8,9 @@ import com.dylibso.chicory.runtime.Machine;
 import com.dylibso.chicory.wasm.WasmModule;
 import io.roastedroot.proxywasm.internal.ProxyWasm;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -82,6 +84,7 @@ public interface PluginFactory {
         private SharedQueueHandler sharedQueueHandler;
         private SharedDataHandler sharedDataHandler;
         private boolean shared;
+        private HashMap<List<String>, byte[]> properties = new HashMap<>();
 
         /**
          * Private constructor for the Builder.
@@ -102,6 +105,42 @@ public interface PluginFactory {
          */
         public PluginFactory.Builder withName(String name) {
             this.name = name;
+            return this;
+        }
+
+        /**
+         * Sets the properties for this plugin instance.
+         *
+         * @param properties A map where keys are the property names expected by the WASM module,
+         *                  and values are the corresponding byte arrays.
+         * @return this {@code Builder} instance for method chaining.
+         */
+        public PluginFactory.Builder withProperties(Map<List<String>, byte[]> properties) {
+            this.properties = new HashMap<>(properties);
+            return this;
+        }
+
+        /**
+         * Sets a single property for this plugin instance.
+         *
+         * @param key The key of the property to set.
+         * @param value The value of the property to set.
+         * @return this {@code Builder} instance for method chaining.
+         */
+        public PluginFactory.Builder withProperty(List<String> key, byte[] value) {
+            this.properties.put(key, value);
+            return this;
+        }
+
+        /**
+         * Sets a single property for this plugin instance.
+         *
+         * @param key The key of the property to set.
+         * @param value The value of the property to set.
+         * @return this {@code Builder} instance for method chaining.
+         */
+        public PluginFactory.Builder withProperty(List<String> key, String value) {
+            this.properties.put(key, bytes(value));
             return this;
         }
 
@@ -362,6 +401,15 @@ public interface PluginFactory {
             SharedDataHandler sharedDataHandler = this.sharedDataHandler;
             boolean shared = this.shared;
 
+            HashMap<List<String>, byte[]> properties = new HashMap<>();
+            if (this.properties != null) {
+                for (Map.Entry<List<String>, byte[]> listEntry : this.properties.entrySet()) {
+                    byte[] value = listEntry.getValue();
+                    value = Arrays.copyOf(value, value.length);
+                    this.properties.put(List.copyOf(listEntry.getKey()), value);
+                }
+            }
+
             return new PluginFactory() {
 
                 @Override
@@ -389,7 +437,8 @@ public interface PluginFactory {
                             pluginConfig,
                             metricsHandler,
                             sharedQueueHandler,
-                            sharedDataHandler);
+                            sharedDataHandler,
+                            properties);
                 }
             };
         }
