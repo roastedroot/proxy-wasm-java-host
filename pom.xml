@@ -57,7 +57,7 @@
     <skipITs>true</skipITs>
 
     <!-- build tool versions -->
-    <checkstyle.version>10.25.0</checkstyle.version>
+    <checkstyle.version>10.26.1</checkstyle.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <spotless-maven-plugin.version>2.44.5</spotless-maven-plugin.version>
     <maven.compiler.version>3.14.0</maven.compiler.version>
