@@ -64,7 +64,7 @@
     <compiler-plugin.version>${maven.compiler.version}</compiler-plugin.version>
     <surefire-plugin.version>3.5.2</surefire-plugin.version>
     <failsafe-plugin.version>${surefire-plugin.version}</failsafe-plugin.version>
-    <jandex.version>3.3.2</jandex.version>
+    <jandex.version>3.4.0</jandex.version>
     <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
     <dependency-plugin.version>3.8.1</dependency-plugin.version>
 
