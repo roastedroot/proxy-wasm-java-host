@@ -30,7 +30,7 @@
   <name>${project.artifactId}</name>
 
   <properties>
-    <tomee.version>10.1.0</tomee.version>
+    <tomee.version>10.1.1</tomee.version>
     <version.arquillian>1.10.0.Final</version.arquillian>
     <failOnMissingWebXml>false</failOnMissingWebXml>
     <maven.compiler.target>17</maven.compiler.target>
