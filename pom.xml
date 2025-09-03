@@ -74,7 +74,7 @@
     <!-- runtime versions -->
     <chicory.version>1.5.1</chicory.version>
     <jersey.version>3.1.11</jersey.version>
-    <jetty.version>11.0.25</jetty.version>
+    <jetty.version>11.0.26</jetty.version>
 
   </properties>
 
